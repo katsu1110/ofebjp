@@ -9,11 +9,12 @@ Foreign Exchange Bot using Oanda API
 import os
 import pathlib
 import datetime
-import numpy as np
-import pandas as pd
 import requests
 import json
 import time
+from tqdm.auto import tqdm
+import numpy as np
+import pandas as pd
 
 # --------------------------
 # Config  
@@ -37,7 +38,7 @@ class CFG:
 
     # candles
     PRICE = 'M' # B, A
-    GRANULARITY = 'M5' # S30, H1, D, W
+    GRANULARITY = 'M10' # S30, H1, D, W
     COUNT = 5000 # 500
 
     # dir
@@ -78,8 +79,8 @@ def get_url(action='order'):
             str(CFG.API_AccountID), CFG.INSTRUMENT
             )
     elif action == 'candles':
-        url = CFG.API_URL + "/v3/accounts/%s/candles?count=%s&price=%s&granularity=%s" % (
-            str(CFG.API_AccountID), CFG.COUNT, CFG.PRICE, CFG.GRANULARITY
+        url = CFG.API_URL + "/v3/accounts/%s/instruments/%s/candles?count=%s&price=%s&granularity=%s" % (
+            str(CFG.API_AccountID), CFG.INSTRUMENT, CFG.COUNT, CFG.PRICE, CFG.GRANULARITY
             )
     return url
 
@@ -97,33 +98,107 @@ def get_header(action='candles'):
     return headers
 
 # candles
-def get_candles():
+def get_ohlcv(
+    api_url='https://api-fxtrade.oanda.com'
+    , account_id: str='999-999-99999999-999'
+    , api_token: str= '********************************-********************************'
+    , instrument: str='USD_JPY'
+    , count: int=500
+    , price_type: str='M'
+    , granularity: str='M10'
+    , tz : str='Asia/Tokyo'
+    , repeat : int=1
+    ) -> pd.DataFrame:
+
     """
-    get candles
+    Get historical OHLCV up to the latest period
+
+    :INPUT:
+    - api_url : api url
+    - account_id : your Oanda account id
+    - api_token : your Oanda api token
+    - instrument : currency pair (e.g., 'USD_JPY', 'EUR_JPY')
+    - count : the number of records to be fetched (1 <= count <= 5000)
+    - price_type : 'M' (mean), 'A' (ask), 'B' (bid)
+    - granularity : granularity of records (e.g., 'S15', 'M1', 'H4', 'D', 'W')
+    - tz : time zone (e.g., 'Asia/Tokyo', 'US/Pacific')
+    - repeat : the number of repeats to fetch records (more repeats, longer historical data)
+
+    :OUTPUT:
+    - pandas dataframe (time, open, high, low, close, volume)
+
+    :EXAMPLE:
+    # your account info
+    account_id = '999-999-99999999-999'
+    api_token = '********************************-********************************'
+
+    # fetch ohlcv via API
+    df = get_candles(
+        api_url='https://api-fxtrade.oanda.com'
+        , account_id=account_id
+        , api_token=api_token
+        , instrument='USD_JPY'
+        , granularity='M10'
+    )
+
+    # check
+    print(df.shape)
+    df.tail()
+
+    :REFERENCE:
+    - https://jantzen.hatenablog.com/entry/oandaapi_03
+    - https://jantzen.hatenablog.com/entry/oandaapi_04
     """
-    # url
-    url = get_url('candles')
+    # endpoint
+    url = f'{api_url}/v3/accounts/{account_id}/instruments/{instrument}/candles?'
 
     # header
-    headers = get_header('candles')
+    headers = { 
+        "Accept-Datetime-Format" : "UNIX",
+        "Authorization" : "Bearer " + api_token
+    }
 
-    # request to server
-    response = requests.get(url, headers=headers)
-    Response_Body = response.json()
-    
-    # fetch
-    df = pd.json_normalize(
-        Response_Body
-        , record_path='candles'
-        , meta=['instrument', 'granularity']
-        , sep='_'
-        ).drop(columns=['complete', 'granularity'])
+    # fetch data
+    df = pd.DataFrame()
+    for i in tqdm(range(repeat)):
+        # request to server
+        if i == 0:
+            url_ = f'{url}count={count}&price={price_type}&granularity={granularity}'
+        else:
+            to = Response_Body["candles"][0]["time"] 
+            since = '{}.000000000'.format(int(float(to) - (float(Response_Body["candles"][-1]["time"]) - float(to))))
+            url_ = f'{url}&price={price_type}&granularity={granularity}&from={since}&to={to}&includeFirst=False'
+            
+        print(f'endpoint: {url_}')
+        try:
+            response = requests.get(url_, headers=headers)
+            Response_Body = response.json()
+        except Exception as e:
+            print(str(e))
+        
+        # format to pandas dataframe
+        tmp = pd.json_normalize(
+            Response_Body
+            , record_path='candles'
+            , meta=['instrument', 'granularity']
+            , sep='_'
+            ).drop(columns=['granularity'])
+
+        # concat
+        df = pd.concat([tmp, df])
+
+        # sleep
+        time.sleep(1)
 
     # fix column names
     df.rename(columns={'mid_o': 'open', 'mid_h': 'high', 'mid_l': 'low', 'mid_c': 'close'}, inplace=True)
+    df = df[
+        ['time', 'open', 'high', 'low', 'close', 'volume']
+    ].drop_duplicates().sort_values(by=['time']).reset_index(drop=True)
 
     # convert to JST
-    df['time'] = pd.to_datetime(df['time']).dt.tz_convert('Asia/Tokyo')
+    df['time'] = df['time'].apply(lambda x : datetime.datetime.utcfromtimestamp(int(x.split('.')[0])))
+    df['time'] = pd.to_datetime(df['time']).dt.tz_localize(tz)
 
     return df
   
