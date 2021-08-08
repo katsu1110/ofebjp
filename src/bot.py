@@ -202,33 +202,73 @@ def get_ohlcv(
 
     return df
   
-#データ情報の変数の設定
-Order_units = 1
-Entry_price = 104.44
-  
-data_Limit = {
-    "order": {
-            "units": Order_units,
-            "price": str(Entry_price),
-            "instrument": CFG.INSTRUMENT,
-            "timeInForce": "GTC",
-            "type": "LIMIT",
-            "positionFill": "DEFAULT",
-            }
-    }    
+def order(
+    api_url='https://api-fxtrade.oanda.com'
+    , account_id: str='999-999-99999999-999'
+    , api_token: str= '********************************-********************************'
+    , instrument: str='USD_JPY'
+    , order_units: int=1
+    , entry_price: float=104.44
+    , order_type: str='MARKET'
+    , time_in_force: str='IOC'
+    , position_fill : str='DEFAULT'
+    ):
+
+    """
+    Post an order via Oanda API
+
+    :INPUT:
+    - api_url : api url
+    - account_id : your Oanda account id
+    - api_token : your Oanda api token
+    - instrument : currency pair (e.g., 'USD_JPY', 'EUR_JPY')
+    - order_units : order unit (negative for short position)
+    - entry_price : entry price
+    - order_type : LIMIT or MARKET
+    - time_in_force : FOK or IOC
+    - position_fill : DEFAULT（REDUCE_FIRST), OPEN_ONLY, REDUCE_FIRST, REDUCE_ONLY
+
+    :EXAMPLE:
+    # your account info
+    account_id = '999-999-99999999-999'
+    api_token = '********************************-********************************'
+
+    # sell 2 USD_JPY with market order
+    order(
+        api_url='https://api-fxtrade.oanda.com'
+        , account_id=account_id
+        , api_token=api_token
+        , instrument='USD_JPY'
+        , order_units=2
+        , entry_price=-104.44
+        , order_type='MARKET'
+    )
+
+    :REFERENCE:
+    - https://jantzen.hatenablog.com/entry/oandaapi-10
+    """
     
-def order(data_Limit: dict):
-    """
-    order
-    """
-    # url
-    url = get_url('order')
+    # endpoint
+    url = f'{api_url}/v3/accounts/{account_id}/orders'
 
     # header
-    headers = get_header('order')
+    headers = { 
+        "Authorization" : 'Bearer ' + api_token
+        , 'Content-Type': 'application/json'
+    }
 
-    # data to json
-    data = json.dumps(data_Limit)
+    # format order data to json
+    data = {
+        "order": {
+                "units": str(order_units),
+                "price": str(entry_price),
+                "instrument": instrument,
+                "timeInForce": time_in_force,
+                "type": order_type,
+                "positionFill": "DEFAULT",
+                }
+        }
+    data = json.dumps(data)
 
     # order
     try:
