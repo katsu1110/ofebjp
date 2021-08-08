@@ -212,6 +212,8 @@ def order(
     , order_type: str='MARKET'
     , time_in_force: str='IOC'
     , position_fill : str='DEFAULT'
+    , take_profit_price=None
+    , stop_loss_price=None
     ):
 
     """
@@ -227,6 +229,8 @@ def order(
     - order_type : LIMIT or MARKET
     - time_in_force : FOK or IOC
     - position_fill : DEFAULT（REDUCE_FIRST), OPEN_ONLY, REDUCE_FIRST, REDUCE_ONLY
+    - take_profit_price : price for take profit
+    - stop_loss_price : price for stop loss
 
     :EXAMPLE:
     # your account info
@@ -265,9 +269,13 @@ def order(
                 "instrument": instrument,
                 "timeInForce": time_in_force,
                 "type": order_type,
-                "positionFill": "DEFAULT",
+                "positionFill": position_fill,
                 }
         }
+    if take_profit_price is not None:
+        data['order']['takeProfitOnFill'] = {'price': str(take_profit_price)}
+    if stop_loss_price is not None:
+        data['order']['stopLossOnFill'] = {'price': str(stop_loss_price)}
     data = json.dumps(data)
 
     # order
@@ -286,7 +294,7 @@ def order(
         # ordered
         elif 'orderCreateTransaction' in Response_Body.json().keys(): # 成功したらOrder IDをもとに検索
             Order_No = Response_Body.json()['orderCreateTransaction']['id']
-            url = CFG.API_URL + "/v3/accounts/%s/orders/%s" %(str(CFG.API_AccountID), Order_No)
+            url = f'{api_url}/v3/accounts/{account_id}/orders/{Order_No}'
 
             while True:
                 Response_Body = requests.get(url, headers=headers)
@@ -304,11 +312,12 @@ def order(
                         print("executed...!!!")
                         Trade_No = response["order"]['tradeOpenedID']
                     else:
-                        print("その他の場合: %s" %(response["order"]["state"]))                                
+                        print("Other case: %s" %(response["order"]["state"]))                                
                         break
                         
                     time.sleep(60)
-                #Loop Return                
+
+                # Loop Return                
                 
         # if order is not filled
         elif 'orderCancelTransaction' in Response_Body.json().keys():
