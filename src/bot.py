@@ -67,36 +67,6 @@ logger.info('START!')
 # --------------------------
 # Utils
 # --------------------------
-# url
-def get_url(action='order'):
-    """
-    get proper url
-    """
-    if action == 'order':
-        url = CFG.API_URL + "/v3/accounts/%s/orders" % str(CFG.API_AccountID)
-    elif action == 'pricing':
-        url = CFG.API_URL + "/v3/accounts/%s/pricing?instruments=%s" % (
-            str(CFG.API_AccountID), CFG.INSTRUMENT
-            )
-    elif action == 'candles':
-        url = CFG.API_URL + "/v3/accounts/%s/instruments/%s/candles?count=%s&price=%s&granularity=%s" % (
-            str(CFG.API_AccountID), CFG.INSTRUMENT, CFG.COUNT, CFG.PRICE, CFG.GRANULARITY
-            )
-    return url
-
-# header
-def get_header(action='candles'):
-    """
-    get header
-    """
-    headers = { 
-        "Accept-Datetime-Format" : "UNIX",
-        "Authorization" : "Bearer " + CFG.API_Token
-    }
-    if action == 'order':
-        headers["Content-Type"] = "application/json"
-    return headers
-
 # candles
 def get_ohlcv(
     api_url='https://api-fxtrade.oanda.com'
@@ -226,9 +196,9 @@ def order(
     - instrument : currency pair (e.g., 'USD_JPY', 'EUR_JPY')
     - order_units : order unit (negative for short position)
     - entry_price : entry price
-    - order_type : LIMIT or MARKET
-    - time_in_force : FOK or IOC
-    - position_fill : DEFAULT（REDUCE_FIRST), OPEN_ONLY, REDUCE_FIRST, REDUCE_ONLY
+    - order_type : 'LIMIT' or 'MARKET'
+    - time_in_force : 'FOK' or 'IOC'
+    - position_fill : 'DEFAULT'（'REDUCE_FIRST'), 'OPEN_ONLY', 'REDUCE_FIRST', 'REDUCE_ONLY'
     - take_profit_price : price for take profit
     - stop_loss_price : price for stop loss
 
@@ -335,7 +305,7 @@ def order(
         print(e)
 
 def main():
-    print('aaa')
+    print('write your own logic!')
 
 if __name__ == "__main__":
     main()
